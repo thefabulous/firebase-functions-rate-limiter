@@ -22,8 +22,10 @@ export class FirebaseFunctionsRateLimiter {
     public static withFirestoreBackend(
         configuration: FirebaseFunctionsRateLimiterConfiguration,
         firestore: admin.firestore.Firestore | FirestoreEquivalent,
+        createExpireAtFromMillis?: ((millis: number) => any)
     ): FirebaseFunctionsRateLimiter {
         const provider = new FirestorePersistenceProvider(firestore);
+        if (createExpireAtFromMillis) provider.setCreateExpireAtFromMillis(createExpireAtFromMillis);
         return new FirebaseFunctionsRateLimiter(configuration, provider);
     }
 
@@ -60,6 +62,7 @@ export class FirebaseFunctionsRateLimiter {
     private constructor(
         configuration: FirebaseFunctionsRateLimiterConfiguration,
         persistenceProvider: PersistenceProvider,
+        createExpireAtFromMillis?: (millis: number) => any,
     ) {
         this.configurationFull = {
             ...FirebaseFunctionsRateLimiterConfiguration.DEFAULT_CONFIGURATION,

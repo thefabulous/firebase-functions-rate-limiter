@@ -9,13 +9,14 @@ import { PersistenceRecord } from "./PersistenceRecord";
 export class FirestorePersistenceProvider implements PersistenceProvider {
     private firestore: admin.firestore.Firestore | FirestoreEquivalent;
     private debugFn: (msg: string) => void;
+    private createExpireAtFromMillis: ((millis: number) => any) | undefined;
 
     /* istanbul ignore next (debugFn), because typescript injects if for default parameters */
     public constructor(
         firestore: FirestoreEquivalent,
         debugFn: (msg: string) => void = (msg: string) => {
             /* */
-        },
+        }
     ) {
         this.firestore = firestore;
         ow(this.firestore, "firestore", ow.object);
@@ -50,6 +51,10 @@ export class FirestorePersistenceProvider implements PersistenceProvider {
         this.debugFn = debugFn;
     }
 
+    public setCreateExpireAtFromMillis(createExpireAtFromMillis: (millis: number) => any) {
+        this.createExpireAtFromMillis = createExpireAtFromMillis;
+    }
+
     private async runTransaction(asyncTransactionFn: () => Promise<void>): Promise<void> {
         return await this.firestore.runTransaction(async (transaction: any) => {
             await asyncTransactionFn();
@@ -70,6 +75,13 @@ export class FirestorePersistenceProvider implements PersistenceProvider {
     private async saveRecord(collectionName: string, recordName: string, record: PersistenceRecord): Promise<void> {
         this.debugFn("Save record collection=" + collectionName + ", document=" + recordName);
         await this.getDocumentRef(collectionName, recordName).set(record);
+        const expireAt = record.expireAt && this.createExpireAtFromMillis ?
+            this.createExpireAtFromMillis(record.expireAt * 1000) :
+            null;
+        await this.getDocumentRef(collectionName, recordName).set({
+            u: record.u,
+            expireAt
+        });
     }
 
     private getDocumentRef(
@@ -82,6 +94,7 @@ export class FirestorePersistenceProvider implements PersistenceProvider {
     private createEmptyRecord(): PersistenceRecord {
         return {
             u: [],
+            expireAt: null
         };
     }
 
