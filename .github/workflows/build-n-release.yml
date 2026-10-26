@@ -21,6 +21,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.nodejs }}
+          check-latest: true
       
       - run: scripts/setup-firebase-emulator-for-tests.sh
       
@@ -48,6 +49,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 24
+          check-latest: true
             
       - run: npm ci
       - run: npm run build      
