@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        nodejs: [12, 14, 16, 18]
+        nodejs: [22, 24]
 
     steps:
       - name: Checkout repository
@@ -20,7 +20,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          node-version: ${{ matrix.version }}
+          node-version: ${{ matrix.nodejs }}
       
       - run: scripts/setup-firebase-emulator-for-tests.sh
       
@@ -47,7 +47,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 24
             
       - run: npm ci
       - run: npm run build      
