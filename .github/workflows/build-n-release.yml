@@ -1,7 +1,8 @@
 name: "Build and test"
 
-# No release/coverage jobs: this fork is consumed by git commit pins (backend-functions,
-# data-functions), not npm, and has no NPM_TOKEN or Codecov token, so both could only fail.
+# No release/coverage jobs: backend-functions consumes this fork by git commit pin (not npm), the
+# npm name belongs to upstream (jblew) and the fork has no NPM_TOKEN; the deprecated codecov npm
+# uploader crashes. Coverage is still generated (coverage/lcov.info) by the 22/24 test legs.
 
 on:
   push:
