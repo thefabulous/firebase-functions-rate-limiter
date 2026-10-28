@@ -8,17 +8,22 @@ jobs:
   build_test:
     name: Build and test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     strategy:
       fail-fast: true
       matrix:
-        nodejs: [22, 24]
+        # 16 = engines floor in package.json (consumer support); 22/24 = patched LTS lines.
+        nodejs: [16, 22, 24]
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.nodejs }}
           check-latest: true
@@ -44,9 +49,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          # semantic-release needs full history/tags and authenticates with GITHUB_TOKEN itself.
+          fetch-depth: 0
+          persist-credentials: false
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 24
           check-latest: true
