@@ -28,15 +28,22 @@ jobs:
           node-version: ${{ matrix.nodejs }}
           check-latest: true
       
-      - run: scripts/setup-firebase-emulator-for-tests.sh
+      # firebase-tools (emulators) requires Node >= 20, so the Node 16 floor leg runs unit tests only.
+      - if: matrix.nodejs != 16
+        run: scripts/setup-firebase-emulator-for-tests.sh
       
       - run: npm ci
       
       - run: npm run build
       
-      - run: npm run testall-with-coverage-lcov
+      - if: matrix.nodejs == 16
+        run: npm test
       
-      - run: npm run upload-coverage
+      - if: matrix.nodejs != 16
+        run: npm run testall-with-coverage-lcov
+      
+      - if: matrix.nodejs != 16
+        run: npm run upload-coverage
       
   release:
     name: Release
