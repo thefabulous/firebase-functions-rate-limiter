@@ -8,29 +8,49 @@ jobs:
   build_test:
     name: Build and test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     strategy:
       fail-fast: true
       matrix:
-        nodejs: [12, 14, 16, 18]
+        # 16 = engines floor in package.json (consumer support); 22/24 = patched LTS lines.
+        nodejs: [16, 22, 24]
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - uses: actions/setup-node@v3
+        uses: actions/checkout@v4
         with:
-          node-version: ${{ matrix.version }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.nodejs }}
+          check-latest: true
       
-      - run: scripts/setup-firebase-emulator-for-tests.sh
+      # firebase-tools (emulators) requires Node >= 20, so the Node 16 floor leg runs unit tests only.
+      # The Firestore/Database emulators also hard-fail on Java < 21 (MIN_SUPPORTED_JAVA_MAJOR_VERSION).
+      - if: matrix.nodejs != 16
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - if: matrix.nodejs != 16
+        run: scripts/setup-firebase-emulator-for-tests.sh
       
       - run: npm ci
       
       - run: npm run build
       
-      - run: npm run testall-with-coverage-lcov
+      - if: matrix.nodejs == 16
+        run: npm test
       
-      - run: npm run upload-coverage
+      - if: matrix.nodejs != 16
+        run: npm run testall-with-coverage-lcov
+      
+      - if: matrix.nodejs != 16
+        run: npm run upload-coverage
       
   release:
     name: Release
@@ -43,11 +63,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - uses: actions/setup-node@v3
+        uses: actions/checkout@v4
         with:
-          node-version: 16
+          # semantic-release needs full history/tags and authenticates with GITHUB_TOKEN itself.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          check-latest: true
             
       - run: npm ci
       - run: npm run build      

@@ -19,7 +19,7 @@ describe("PersistenceProviders", function() {
         const firestore = app.firestore();
         const database = app.database();
         const provider: PersistenceProvider = undefined as any;
-        const emptyPersistenceRecord: PersistenceRecord = { u: [] };
+        const emptyPersistenceRecord: PersistenceRecord = { u: [], expireAt: null };
         const nonModifyingUpdater = (pr: PersistenceRecord) => pr;
         return {
             app,
@@ -92,7 +92,7 @@ describe("PersistenceProviders", function() {
                     const spy = sinon.spy();
                     await provider.updateAndGet(uniqueCollectionName, uniqueDocName, record => {
                         spy();
-                        return { u: [] };
+                        return { u: [], expireAt: null };
                     });
                     expect(spy.callCount).to.be.equal(1);
                 });
@@ -110,6 +110,7 @@ describe("PersistenceProviders", function() {
 
                     const recToBeSaved: PersistenceRecord = {
                         u: [1, 2, 3],
+                        expireAt: null,
                     };
                     await provider.updateAndGet(uniqueCollectionName, uniqueDocName, r => recToBeSaved);
 
@@ -139,6 +140,7 @@ describe("PersistenceProviders", function() {
 
                     const recToBeSaved: PersistenceRecord = {
                         u: [1, 2, 3],
+                        expireAt: null,
                     };
                     await provider.updateAndGet(uniqueCollectionName, uniqueDocName, r => recToBeSaved);
 
