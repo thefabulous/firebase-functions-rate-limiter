@@ -29,6 +29,13 @@ jobs:
           check-latest: true
       
       # firebase-tools (emulators) requires Node >= 20, so the Node 16 floor leg runs unit tests only.
+      # The Firestore/Database emulators also hard-fail on Java < 21 (MIN_SUPPORTED_JAVA_MAJOR_VERSION).
+      - if: matrix.nodejs != 16
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
       - if: matrix.nodejs != 16
         run: scripts/setup-firebase-emulator-for-tests.sh
       
