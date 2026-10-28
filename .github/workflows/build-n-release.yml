@@ -1,4 +1,8 @@
-name: "Build and release"
+name: "Build and test"
+
+# No release/coverage jobs: backend-functions consumes this fork by git commit pin (not npm), the
+# npm name belongs to upstream (jblew) and the fork has no NPM_TOKEN; the deprecated codecov npm
+# uploader crashes. Coverage is still generated (coverage/lcov.info) by the 22/24 test legs.
 
 on:
   push:
@@ -48,35 +52,3 @@ jobs:
       
       - if: matrix.nodejs != 16
         run: npm run testall-with-coverage-lcov
-      
-      - if: matrix.nodejs != 16
-        run: npm run upload-coverage
-      
-  release:
-    name: Release
-    runs-on: ubuntu-latest
-    needs: [build_test]
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          # semantic-release needs full history/tags and authenticates with GITHUB_TOKEN itself.
-          fetch-depth: 0
-          persist-credentials: false
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          check-latest: true
-            
-      - run: npm ci
-      - run: npm run build      
-      - run: npx semantic-release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
