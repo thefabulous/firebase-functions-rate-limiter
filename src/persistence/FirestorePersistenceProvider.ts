@@ -30,11 +30,14 @@ export class FirestorePersistenceProvider implements PersistenceProvider {
         updaterFn: (record: PersistenceRecord) => PersistenceRecord,
     ): Promise<PersistenceRecord> {
         let result: PersistenceRecord | undefined;
-        await this.runTransaction(async () => {
-            const record = await this.getRecord(collectionName, recordName);
+        const ref = this.getDocumentRef(collectionName, recordName);
+        // Read and write through the transaction so concurrent calls cannot both pass the quota check.
+        await this.firestore.runTransaction(async (transaction: any) => {
+            const record = this.toRecord(await transaction.get(ref), collectionName, recordName);
             const updatedRecord = updaterFn(record);
             if (this.hasRecordChanged(record, updatedRecord)) {
-                await this.saveRecord(collectionName, recordName, updatedRecord);
+                this.debugFn("Save record collection=" + collectionName + ", document=" + recordName);
+                transaction.set(ref, this.toStoredRecord(updatedRecord));
             }
             result = updatedRecord;
         });
@@ -55,14 +58,16 @@ export class FirestorePersistenceProvider implements PersistenceProvider {
         this.createExpireAtFromMillis = createExpireAtFromMillis;
     }
 
-    private async runTransaction(asyncTransactionFn: () => Promise<void>): Promise<void> {
-        return await this.firestore.runTransaction(async (transaction: any) => {
-            await asyncTransactionFn();
-        });
-    }
-
     private async getRecord(collectionName: string, recordName: string): Promise<PersistenceRecord> {
         const docSnapshot = await this.getDocumentRef(collectionName, recordName).get();
+        return this.toRecord(docSnapshot, collectionName, recordName);
+    }
+
+    private toRecord(
+        docSnapshot: { exists: boolean; data(): object | undefined },
+        collectionName: string,
+        recordName: string,
+    ): PersistenceRecord {
         this.debugFn("Got record from collection=" + collectionName + ", document=" + recordName);
 
         if (!docSnapshot.exists) return this.createEmptyRecord();
@@ -72,16 +77,12 @@ export class FirestorePersistenceProvider implements PersistenceProvider {
         return record;
     }
 
-    private async saveRecord(collectionName: string, recordName: string, record: PersistenceRecord): Promise<void> {
-        this.debugFn("Save record collection=" + collectionName + ", document=" + recordName);
-        await this.getDocumentRef(collectionName, recordName).set(record);
+    // One write: expireAt is stored in the form the TTL policy reads (or null without a converter).
+    private toStoredRecord(record: PersistenceRecord): object {
         const expireAt = record.expireAt && this.createExpireAtFromMillis ?
             this.createExpireAtFromMillis(record.expireAt * 1000) :
             null;
-        await this.getDocumentRef(collectionName, recordName).set({
-            u: record.u,
-            expireAt
-        });
+        return { u: record.u, expireAt };
     }
 
     private getDocumentRef(
