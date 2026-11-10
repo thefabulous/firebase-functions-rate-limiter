@@ -153,4 +153,50 @@ describe("PersistenceProviders", function() {
             });
         }),
     );
+
+    describe("FirestorePersistenceProvider writes", () => {
+        // Counts writes made directly on document references.
+        function countingFirestore(firestore: any) {
+            const writes: any[] = [];
+            const wrapped = Object.create(firestore);
+            wrapped.collection = (name: string) => {
+                const collection = firestore.collection(name);
+                return {
+                    doc: (id: string) => {
+                        const ref = collection.doc(id);
+                        const set = ref.set.bind(ref);
+                        ref.set = (data: any) => {
+                            writes.push(data);
+                            return set(data);
+                        };
+                        return ref;
+                    },
+                };
+            };
+            return { wrapped, writes };
+        }
+
+        it("Saves a changed record with one write holding the converted expireAt", async () => {
+            const { firestore, uniqueCollectionName, uniqueDocName } = mock();
+            const { wrapped, writes } = countingFirestore(firestore);
+            const provider = new FirestorePersistenceProvider(wrapped);
+            provider.setCreateExpireAtFromMillis(millis => `expires-${millis}`);
+
+            await provider.updateAndGet(uniqueCollectionName, uniqueDocName, () => ({ u: [1], expireAt: 5 }));
+
+            expect(writes).to.deep.equal([{ u: [1], expireAt: "expires-5000" }]);
+            const stored = (await firestore.collection(uniqueCollectionName).doc(uniqueDocName).get()).data();
+            expect(stored).to.deep.equal({ u: [1], expireAt: "expires-5000" });
+        });
+
+        it("Stores a null expireAt without a converter, as before", async () => {
+            const { firestore, uniqueCollectionName, uniqueDocName } = mock();
+            const { wrapped, writes } = countingFirestore(firestore);
+            const provider = new FirestorePersistenceProvider(wrapped);
+
+            await provider.updateAndGet(uniqueCollectionName, uniqueDocName, () => ({ u: [1], expireAt: 5 }));
+
+            expect(writes).to.deep.equal([{ u: [1], expireAt: null }]);
+        });
+    });
 });

@@ -74,7 +74,8 @@ export class FirestorePersistenceProvider implements PersistenceProvider {
 
     private async saveRecord(collectionName: string, recordName: string, record: PersistenceRecord): Promise<void> {
         this.debugFn("Save record collection=" + collectionName + ", document=" + recordName);
-        await this.getDocumentRef(collectionName, recordName).set(record);
+        // One write: expireAt is stored in the form the TTL policy reads (or null without a converter),
+        // which is what the second of the two previous writes left in place.
         const expireAt = record.expireAt && this.createExpireAtFromMillis ?
             this.createExpireAtFromMillis(record.expireAt * 1000) :
             null;
