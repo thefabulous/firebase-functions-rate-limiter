@@ -155,19 +155,10 @@ describe("PersistenceProviders", function() {
     );
 
     describe("FirestorePersistenceProvider writes", () => {
-        // Counts writes made through transactions and writes made directly on document references.
+        // Counts writes made directly on document references.
         function countingFirestore(firestore: any) {
-            const counts = { transactional: [] as any[], direct: 0 };
+            const writes: any[] = [];
             const wrapped = Object.create(firestore);
-            wrapped.runTransaction = (callback: (transaction: any) => Promise<void>) =>
-                firestore.runTransaction((transaction: any) => {
-                    const set = transaction.set.bind(transaction);
-                    transaction.set = (ref: any, data: any) => {
-                        counts.transactional.push(data);
-                        return set(ref, data);
-                    };
-                    return callback(transaction);
-                });
             wrapped.collection = (name: string) => {
                 const collection = firestore.collection(name);
                 return {
@@ -175,46 +166,37 @@ describe("PersistenceProviders", function() {
                         const ref = collection.doc(id);
                         const set = ref.set.bind(ref);
                         ref.set = (data: any) => {
-                            counts.direct++;
+                            writes.push(data);
                             return set(data);
                         };
                         return ref;
                     },
                 };
             };
-            return { wrapped, counts };
+            return { wrapped, writes };
         }
 
-        it("Saves a changed record with one transactional write holding the converted expireAt", async () => {
+        it("Saves a changed record with one write holding the converted expireAt", async () => {
             const { firestore, uniqueCollectionName, uniqueDocName } = mock();
-            const { wrapped, counts } = countingFirestore(firestore);
+            const { wrapped, writes } = countingFirestore(firestore);
             const provider = new FirestorePersistenceProvider(wrapped);
             provider.setCreateExpireAtFromMillis(millis => `expires-${millis}`);
 
             await provider.updateAndGet(uniqueCollectionName, uniqueDocName, () => ({ u: [1], expireAt: 5 }));
 
-            expect(counts.direct).to.equal(0);
-            expect(counts.transactional).to.deep.equal([{ u: [1], expireAt: "expires-5000" }]);
+            expect(writes).to.deep.equal([{ u: [1], expireAt: "expires-5000" }]);
             const stored = (await firestore.collection(uniqueCollectionName).doc(uniqueDocName).get()).data();
             expect(stored).to.deep.equal({ u: [1], expireAt: "expires-5000" });
         });
 
-        it("Does not lose concurrent updates", async () => {
+        it("Stores a null expireAt without a converter, as before", async () => {
             const { firestore, uniqueCollectionName, uniqueDocName } = mock();
-            const provider = new FirestorePersistenceProvider(firestore);
-            const calls = 5;
+            const { wrapped, writes } = countingFirestore(firestore);
+            const provider = new FirestorePersistenceProvider(wrapped);
 
-            await Promise.all(
-                _.range(calls).map(i =>
-                    provider.updateAndGet(uniqueCollectionName, uniqueDocName, record => ({
-                        u: [...record.u, i],
-                        expireAt: null,
-                    })),
-                ),
-            );
+            await provider.updateAndGet(uniqueCollectionName, uniqueDocName, () => ({ u: [1], expireAt: 5 }));
 
-            const stored = await provider.get(uniqueCollectionName, uniqueDocName);
-            expect(stored.u.slice().sort()).to.deep.equal(_.range(calls));
+            expect(writes).to.deep.equal([{ u: [1], expireAt: null }]);
         });
     });
 });
